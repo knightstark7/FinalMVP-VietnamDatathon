@@ -1,1 +1,2 @@
 clean_data/sales.csv filter=lfs diff=lfs merge=lfs -text
+clean_data/inventories.csv filter=lfs diff=lfs merge=lfs -text
