@@ -3,6 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
+# from keras.models import load_model
+import os
+import glob
+import re
 
 st.set_page_config(
     page_title="Final MVP Datada",
@@ -11,6 +15,18 @@ st.set_page_config(
 )
 
 st.title("""Automated Financial Report for Retailers""")
+
+# initialize models
+
+
+models_files = glob.glob("../models/lstm_sales_*.keras")
+print(models_files)
+
+channels = [re.findall(r'lstm_sales_(\w+).keras', filename) for filename in models_files]
+# print(channels)
+
+# ltsm_models = load_model('../models/')
+
 
 # sales
 with st.container():
