@@ -81,14 +81,10 @@ with st.container(border=True):
 
     uploaded_files = st.file_uploader("Upload your sales data (*.xlsx) here", 
                                     accept_multiple_files=True)
-
-    if uploaded_files is not None:
+    if uploaded_files:
         full_df = pd.DataFrame()
         for uploaded_file in uploaded_files:
-            
-            # Can be used wherever a "file-like" object is accepted:
             dataframe = pd.read_excel(uploaded_file)
-            
             full_df = pd.concat([full_df, dataframe])
         
         full_df['total_sales'] = full_df['sold_quantity'] * full_df['net_price']
@@ -96,47 +92,49 @@ with st.container(border=True):
         st.write("Here's your merged sales data")
         st.write(full_df)
     
-    if st.button('Press here to analyze your sales data'):
-        st.subheader("Some insights about your data")
-        
-        st.write('Comparing sales in different distribution channels')
-        total_sales_per_channel = full_df.groupby(['channel_id', 'month', 'week'])['total_sales'].sum().reset_index()
-        st.bar_chart(data=total_sales_per_channel, x='channel_id', y='total_sales')
+        if st.button('Press here to analyze your sales data'):
+            st.subheader("Some insights about your data")
+            
+            st.write('Comparing sales in different distribution channels')
+            total_sales_per_channel = full_df.groupby('channel_id')['total_sales'].sum().reset_index()
+            st.bar_chart(data=total_sales_per_channel, x='channel_id', y='total_sales')
 
-        with st.expander('See explanation'):
-            SALES_RANGES = ((float('-inf'), 0), (0, 0))
-            type_comments = [[] for _ in SALES_RANGES]
-            for index, row in total_sales_per_channel.iterrows():
-                typee = 1
+            with st.expander('See explanation'):
+                SALES_RANGES = (float('-inf'), 0, 1e10, 3e10, float('inf'))
+                type_comments = [["Total sales are negative, indicating a concerning situation:\n"
+                                "Urgent measures are required to address the financial challenges."],
+                                ["Total sales are within the low range, suggesting a modest performance:\n",
+                                "Strategies to boost sales should be reviewed and implemented."],
+                                [f"Total sales fall within the medium range, indicating a substantial growth:\n",
+                                "Efforts should be directed towards maintaining and maximizing this positive momentum."],
+                                [f"Total sales for those channels have an exceptional performance:\n",
+                                "Capitalizing on this success, long-term strategies should focus on sustaining and expanding market share."]]
+                
+                for index, row in total_sales_per_channel.iterrows():
+                    for i in range(len(SALES_RANGES) - 1):
+                        if (SALES_RANGES[i] <= row['total_sales'] < SALES_RANGES[i + 1]):
+                            type_comments[i].append(row['channel_id'])
+                            break
+                output = ""
+                for i in range(len(type_comments)):
+                    if len(type_comments[i]) <= 2:
+                        continue
+                    output += type_comments[i][0]
+                    for j in range(2, len(type_comments[i])):
+                        output += '    * ' + type_comments[i][j] + '\n'
+                    output += '=> ' + type_comments[i][1] + '\n'
+                st.text(output)
 
-                # Adjust these conditions based on your actual data and analysis criteria
-                if row['total_sales'] > 100000:
-                    typee = 1
-
-                elif 50000 <= row['total_sales'] <= 100000:
-                    typee = 2
-
-                else:
-                    typee = 3
-                # type_comments.append(observation + comment)
-            # observation += f"Total sales have shown a substantial increase.\n"
-            # comment += "Efforts to capitalize on this positive trend should be intensified."
-            # observation += f"Total sales have maintained a moderate level.\n"
-            # comment += "Continued efforts are required to sustain current sales figures."
-            # observation += f"Total sales have seen a decline.\n"
-            # comment += "Strategies for revitalization and growth need to be explored."
-            st.text('\n'.join(type_comments))
-
-        st.write('Comparing sales in different kind of distribution channels')
-        total_sales_per_distribution_channel = full_df.groupby(['distribution_channel', 'month', 'week'])['total_sales'].sum().reset_index()
-        st.bar_chart(data=total_sales_per_distribution_channel, x='distribution_channel', y='total_sales')
+            st.write('Comparing sales in different kind of distribution channels')
+            total_sales_per_distribution_channel = full_df.groupby('distribution_channel')['total_sales'].sum().reset_index()
+            st.bar_chart(data=total_sales_per_distribution_channel, x='distribution_channel', y='total_sales')
 
 
 
 
-        st.subheader("Sales forecast")
+            st.subheader("Sales forecast")
 
-        st.subheader("Some suggested solutions for you")
+            st.subheader("Some suggested solutions for you")
         
         
     else:
