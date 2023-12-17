@@ -231,8 +231,6 @@ with st.container(border=True):
 
 
             time_trend_comments(sorted_df, 'year-month-week', 'total_sales', SLOPE_RANGES, CVAR_RANGES, TREND_COMMENTS, FLUCTUATE_COMMENTS)
-    else:
-        pass
 
 
 # ----------inventory----------
@@ -256,10 +254,11 @@ with st.container(border=True):
         
         if st.button('Press here to analyze your inventory data'): 
             st.subheader("Some insights about your data")
-
+            
+            
+            
             st.subheader("Current inventory report and some feasible solutions")
-        else:
-            pass
+            
 
 #----------Models----------
 with st.container(border=True):
