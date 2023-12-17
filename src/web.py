@@ -15,17 +15,20 @@ from streamlit_lottie import st_lottie
 # import openai
 import pickle
 # set maxuploadsize to 1GB: streamlit run web.py --server.maxUploadSize=1024
-
 import locale
 
 #---------Model------------
 profit_forecast = None
 quantity_forecast = None
-# with open('../forecast/profit_forecast.pkl', 'rb') as file:
-#     profit_forecast = pickle.load(file)
+with open('../forecast/profit_forecast.pkl', 'rb') as file:
+    profit_forecast = pickle.load(file)
 
-# with open('../forecast/quantity_forecast.pkl', 'rb') as file:
-#     quantity_forecast = pickle.load(file)
+with open('../forecast/quantity_forecast.pkl', 'rb') as file:
+    quantity_forecast = pickle.load(file)
+    
+with open('../forecast/last_week_year.pkl', 'rb') as file:
+    last_week_year = pickle.load(file)
+    
 def get_peak(channel, product_type, df):
     result = []
     idx = df[(df[channel].diff() > 0) & 
@@ -146,6 +149,17 @@ def time_trend_comments(data, x, y, slope_ranges, cv_ranges, trend_comments, flu
     with st.expander('See explanation'):
         st.text(output)
 
+@st.cache_resource
+def load_files(files):
+    full_df = pd.DataFrame()
+    for uploaded_file in files:
+            
+        # Can be used wherever a "file-like" object is accepted:
+        dataframe = pd.read_excel(uploaded_file)
+        
+        full_df = pd.concat([full_df, dataframe])
+    return full_df
+
 # ----------sales----------
 with st.container(border=True):
     st.header('Sales', divider='rainbow')
@@ -153,10 +167,7 @@ with st.container(border=True):
     uploaded_files = st.file_uploader("Upload your sales data (*.xlsx) here", 
                                     accept_multiple_files=True)
     if uploaded_files:
-        full_df = pd.DataFrame()
-        for uploaded_file in uploaded_files:
-            dataframe = pd.read_excel(uploaded_file)
-            full_df = pd.concat([full_df, dataframe])
+        full_df = load_files(uploaded_files)
         
         full_df['total_sales'] = full_df['sold_quantity'].abs() * full_df['net_price']
          
@@ -233,6 +244,7 @@ with st.container(border=True):
             time_trend_comments(sorted_df, 'year-month-week', 'total_sales', SLOPE_RANGES, CVAR_RANGES, TREND_COMMENTS, FLUCTUATE_COMMENTS)
 
 
+
 # ----------inventory----------
 with st.container(border=True):    
     st.header('Inventory', divider='rainbow')
@@ -241,24 +253,67 @@ with st.container(border=True):
                                     accept_multiple_files=True)
 
     if uploaded_files:
-        full_df = pd.DataFrame()
-        for uploaded_file in uploaded_files:
-            
-            # Can be used wherever a "file-like" object is accepted:
-            dataframe = pd.read_excel(uploaded_file)
-            
-            full_df = pd.concat([full_df, dataframe])
+        full_df = load_files(uploaded_files)
             
         st.write("Here's your merged inventory data")
         st.write(full_df)
         
+        # read master data
+        product_detail_df = pd.read_csv(r'../data/MasterData/Productmaster.csv')
         if st.button('Press here to analyze your inventory data'): 
             st.subheader("Some insights about your data")
             
+            st.write("Comparing quantity of different product groups")
+            merged_df = full_df.merge(product_detail_df, on='product_id', how='left')
+            # Calculate total quantity for each product_group
+            by_pro_group = merged_df.groupby('product_group').sum(numeric_only=True).reset_index(names='product group')
+
+            st.bar_chart(by_pro_group, x='product group', y='quantity', color='product group')
+
+            INVENTORY_RANGES = (float('-inf'), 0, .25, .5, 1.1)
+            CHANNELS_COMMENTS = [
+                ["Quantity are negative, indicating a concerning situation",
+                 "Business should take immediate solutions to address the financial challenges."],
+                ["Quantity are within the low range",
+                 "These product groups may have good sales or being in stock for a long time (defective items, sample items)."],
+                [f"Quantity fall within the medium range",
+                "Business should take good measures to resolve the remaining stocks."],
+                [f"Quantity for those channels are very high",
+                "These product groups may have good sales so that the business import lots of them."]
+            ]
+
+            st.write("How do the quantity and ammount change over time?")
+            
+            full_df.drop(inplace=True, columns=['Unnamed: 0', 'index'])
+            years = full_df['calendar_yeer_week'].astype(str).str[:4]
+            months = full_df['calendar_yeer_week'].astype(str).str[4:6]
+            days = full_df['calendar_yeer_week'].astype(str).str[-2:]
+
+            full_df['date'] = years.values + '-' + months.values + '-' + days.values
+            
+            groupup = full_df.groupby('date').sum(numeric_only=True).reset_index(names='date').sort_values(by=['date'])
+            left_columns, right_columns = st.columns(2)
+            with left_columns:
+                st.line_chart(groupup, x='date', y='quantity')
+            with right_columns:
+                st.line_chart(groupup, x='date', y='total_amount')
             
             
-            st.subheader("Current inventory report and some feasible solutions")
             
+            
+
+def format_currency(value):
+    return locale.format_string('%.0f', value, grouping=True)
+locale.setlocale(locale.LC_ALL, 'vi_VN')
+
+def get_week(num_weeks):
+    year, week = last_week_year
+    week += num_weeks
+    if week > 52:
+        week -= 52
+        year += 1
+    return (year, week)
+    
 
 #----------Models----------
 with st.container(border=True):
@@ -271,18 +326,16 @@ with st.container(border=True):
         "Product type",
         ['Dep', 'Giay', 'Sandal', 'PK', 'Tui']
     )
-    locale.setlocale(locale.LC_ALL, 'vi_VN')
-    def format_currency(value):
-        return locale.format_string('%.0f', value, grouping=True)
 
     if st.button('Forecast'):
         idx1, profit_increase, idx2, quantity_increase = prediction(channel, product_type)
         col1, col2 = st.columns(2)
+        st.write('(Year, Week)')
         with col1:
-            for week1, p in zip(idx1, profit_increase):
+            for week_p, p in zip(idx1, profit_increase):
                 p = locale.format_string('%.0f', round(int(p), -3), grouping=True)
-                st.write(f'Week {week1}, profit increase of {p} VND')
+                st.write(f'{get_week(week_p)}, profit increase of {p} VND')
 
         with col2:
-            for week2, q in zip(idx2, quantity_increase):
-                st.write(f'Week {week2}, quantity increase of {int(q)} products')
+            for week_q, q in zip(idx2, quantity_increase):
+                st.write(f'{get_week(week_q)}, quantity increase of {int(q)} products')
