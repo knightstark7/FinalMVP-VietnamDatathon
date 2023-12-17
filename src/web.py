@@ -59,7 +59,6 @@ with st.container():
     st.title("""Automated Financial Report for Retailers""")
     st.header("Team 16: Datada :wave:")
     st.subheader('Dataset 2: Sales and Inventory Data Of VietNam Retailers',divider='rainbow')
-    st.write('Goals:...')
 
 # ----------LOAD ASSETS----------
 def load_lottie(url):
@@ -281,6 +280,9 @@ with st.container(border=True):
                 [f"Quantity for those channels are very high",
                 "These product groups may have good sales so that the business import lots of them."]
             ]
+
+            classify_and_comments(by_pro_group, 'product group', 'quantity',
+                                  INVENTORY_RANGES, CHANNELS_COMMENTS)
 
             st.write("How do the quantity and ammount change over time?")
             
